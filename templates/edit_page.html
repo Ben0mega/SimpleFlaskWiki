@@ -1,0 +1,15 @@
+<html>
+	<head>
+			<title> Editing {{ title }} </title>
+	</head>
+	<body>
+		<form action='{{url_for('save_page')}}' method='POST' enctype='multipart/formdata'>
+			<input type='text' value='{{ title }}' name='title'>
+			<input type='submit'>
+			<br/>
+			<textarea rows=50 cols=120 name='content'>
+{{ content }}
+			</textarea>
+		</form>
+	</body>
+</html>
