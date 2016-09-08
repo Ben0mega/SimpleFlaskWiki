@@ -1,4 +1,5 @@
 import markdown
+import git
 import glob
 import string
 import html
@@ -8,6 +9,13 @@ import os
 from flask import Flask,render_template,Markup, request, redirect, url_for, send_file
 
 app = Flask(__name__)
+
+@app.route("/")
+def index():
+	try:
+		return wiki_page('Main')
+	except FileNotFoundError:
+		return render_template('wiki_page.html', title='Main', content='Edit me')
 
 @app.route('/pages/<name>')
 def wiki_page(name):
@@ -35,6 +43,8 @@ def nameToTitle(name):
 # get file_name for name.  if content_type is specified, verify that the extension is correct
 def nameToFileName(name, content_type=None):
 	name = sanitize(name)
+	if name == '':
+		raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), name)
 	files = glob.glob(os.path.join('pages', name+'.*'))
 	assert(len(files) < 2)
 	if len(files) == 0:
@@ -88,37 +98,51 @@ def sanitize(name):
 	return ''.join(safe(a) for a in name)
 
 
-#@app.route('/edit/<name>/<revision>') # for previous revisions
 @app.route('/edit/')
 @app.route('/edit/<name>')
-def edit_page(name=None, revision=None):
+@app.route('/edit/<name>/<revision>')
+def edit_page(name='', revision=None):
 	title = nameToTitle(name)
 	try:
 		file_name = nameToFileName(name)
 	except FileNotFoundError:
-		file_name = "SENTINEL.jpeg"
+		file_name = "DISALLOWED\tNAME.jpeg"
 
 	if isBinary(file_name):
 		content = "BINARY/UNKNOWN/EMPTY FILE"
 	else:
-		with open(file_name) as f:
-			content = f.read()
-		content = html.escape(content)
-	return render_template('edit_page.html', content=content, title=title)
+		content = html.escape(get_revision_content(file_name, revision))
+	revisions = list((html.escape(c.message), c.hexsha) for c in get_revisions(file_name))
+	print(revisions)
+	return render_template('edit_page.html', content=content, title=title, revisions=revisions)
 
 def get_revisions(file_name):
-	# list revisions ids and comments
-	# going to be listed on the edits page so we can
-	# click back to an old revision
-	pass
+	repo = get_repo()
+	file_name = dropTopLevelDir(file_name)
+	return list(repo.iter_commits(paths=file_name))
 
 def get_revision_content(file_name, revision_id):
-	pass
+	if revision_id is None:
+		with open(file_name) as f:
+			return f.read()
+
+	repo = get_repo()
+	commit = repo.commit(revision_id)
+	file_name = dropTopLevelDir(file_name)
+	data = (commit.tree/file_name).data_stream.read()
+	print(data.decode('utf-8'))
+	return data.decode('utf-8')
 
 @app.route('/save/', methods=['POST'])
 def save_page():
 	name = request.form['title']
 	content = request.form.get('content', None)
+	msg = "User {0!s} @ IP {1!s} edited {2!s} with message: {3!s}".format(
+			request.form['user'],
+			request.remote_addr,
+			name,
+			request.form['msg']
+			)
 
 	try:
 		fn = nameToFileName(name)
@@ -128,20 +152,39 @@ def save_page():
 
 	file_ = request.files.get('file')
 	if not file_:
-		save_content(fn, content)
+		save_content(fn, content, msg)
 		return redirect(url_for('wiki_page', name=name))
 
 	# use the actual mimetype since we now have a file...
 	fn = nameToFileName(name, file_.mimetype)
-	save_content(fn, file_)
+	save_content(fn, file_, msg)
 	return redirect(url_for('wiki_page', name=name))
 
-def save_content(fn, content):
+def save_content(fn, content, msg):
+	#verify "pages" dir exists...
+	repo = get_repo()
+
 	if hasattr(content, 'save'):
 		content.save(fn)
 	else:
 		with open(fn, 'w') as f:
 			f.write(content)
+
+	print(dropTopLevelDir(fn))
+	print(msg)
+	repo.index.add([dropTopLevelDir(fn)])
+	repo.index.commit(msg)
+
+def dropTopLevelDir(fn):
+	path = os.path.split(fn)
+	return os.path.join(*path[1:])
+
+def get_repo():
+	if not os.path.exists("pages"):
+		repo = git.Repo.init('pages/')
+		repo.index.commit('Init commit')
+		return repo
+	return git.Repo('pages/')
 
 if __name__ == "__main__":
 	app.run()
