@@ -3,10 +3,11 @@
 			<title> Editing {{ title }} </title>
 	</head>
 	<body>
-		<form action='{{url_for('save_page')}}' method='POST' enctype='multipart/formdata'>
+		<form action='{{url_for('save_page')}}' method='POST' enctype='multipart/form-data'>
 			<input type='text' value='{{ title }}' name='title'>
-			<input type='submit'>
+			<input type='submit' value='Upload'>
 			<br/>
+			<input type='file' name='file'> <br/>
 			<textarea rows=50 cols=120 name='content'>
 {{ content }}
 			</textarea>
