@@ -4,6 +4,8 @@
 	</head>
 	<body>
 		<form action='{{url_for('save_page')}}' method='POST' enctype='multipart/form-data'>
+			<input type='text' name='user'>
+			<input type='text' name='msg'>
 			<input type='text' value='{{ title }}' name='title'>
 			<input type='submit' value='Upload'>
 			<br/>
@@ -12,5 +14,11 @@
 {{ content }}
 			</textarea>
 		</form>
+		<div>
+			<ul>
+			{% for (msg, rev) in revisions %}
+			<li> <a href='{{url_for('edit_page', name=title, revision=rev)}}'> {{ msg }} </a>
+			{% endfor %}
+			</ul>
 	</body>
 </html>

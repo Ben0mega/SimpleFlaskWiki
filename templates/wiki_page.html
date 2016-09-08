@@ -3,6 +3,13 @@
 			<title> {{ title }} </title>
 	</head>
 	<body>
-		{{ content }}
+		<div>
+			<a href="{{url_for('edit_page',name=title)}}"> Edit Me </a>
+			<br/>
+			<a href="{{url_for('edit_page',name="")}}"> Add New Page </a>
+		</div>
+		<div>
+			{{ content }}
+		</div>
 	</body>
 </html>
